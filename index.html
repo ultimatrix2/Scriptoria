@@ -2,36 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PDF Reader</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; }
-    #controls { margin: 10px; }
-    canvas { border: 1px solid #333; margin-top: 10px; background: white; }
-    button { padding: 6px 12px; margin: 0 5px; }
-    #drop-area {
-      margin: 15px auto;
-      padding: 20px;
-      border: 2px dashed #666;
-      border-radius: 6px;
-      width: 60%;
-      background: #fff;
-      color: #444;
-    }
-  </style>
+  <title>Scriptoria - PDF Reader</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
-  <h2>PDF Reader</h2>
-
-  <div id="controls">
-    <button id="open">📂 Open PDF</button>
-    <button id="prev">⬅ Prev</button>
-    <button id="next">Next ➡</button>
-    <span>Page: <span id="page-num">0</span> / <span id="page-count">0</span></span>
+  <!-- Top Toolbar -->
+ 
+  <div id="toolbar">
+    <button id="open">📂 Open</button>
+    <button id="save">💾 Save</button>
+    <button id="zoom-out">🔍- Zoom Out</button>
+    <span id="zoom-display">100%</span>
+    <button id="zoom-in">🔍+ Zoom In</button>
+    <button id="rotate-left">⟲ Rotate</button>
+    <button id="rotate-right">⟳ Rotate</button>
+    <button id="highlight">🖍 Highlight</button>
+    <button id="add-text">✏ Add Text</button>
+    <button id="fullscreen">⛶ Fullscreen</button>
+    <button id="dark-mode-toggle">🌙/☀️ Mode</button>
   </div>
 
-  <div id="drop-area">Drag & Drop PDF here</div>
-  <canvas id="pdf-render"></canvas>
+  <!-- Tabs for Multiple PDFs -->
+  <div id="tabs-container">
+    <ul id="tabs"></ul>
+  </div>
 
-  <script type="module" src="./renderer.js"></script>
+  <!-- Main Layout -->
+  <div id="layout">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="tab-buttons">
+        <button data-target="thumbnails">Thumbnails</button>
+        <button data-target="bookmarks">Bookmarks</button>
+        <button data-target="search">🔍 Search</button>
+      </div>
+      <div id="sidebar-content">
+        <div id="thumbnails"></div>
+        <div id="bookmarks" style="display:none;"></div>
+        <div id="search" style="display:none;">
+          <input type="text" id="search-input" placeholder="Search text..." />
+          <div id="search-results"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PDF Display Area -->
+    <div id="pdf-viewer">
+      <div id="controls">
+        <button id="prev">⬅ Prev</button>
+        <span>Page: <input type="number" id="page-num" value="0" min="1" style="width: 50px; text-align: center;"> / <span id="page-count">0</span></span>
+        <button id="next">Next ➡</button>
+        <div id="view-modes">
+          <button id="view-single" class="view-mode active">Single</button>
+          <button id="view-split" class="view-mode">Split</button>
+          <button id="view-continuous" class="view-mode">Continuous</button>
+        </div>
+      </div>
+      <div id="canvas-container">
+        <canvas id="pdf-render"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="renderer.js"></script>
 </body>
 </html>
