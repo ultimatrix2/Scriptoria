@@ -1,15 +1,23 @@
-Scriptoria PDF Reader
+Scriptoria : PDF Reader
 
-A simple desktop PDF reader built using Electron and pdf.js, featuring text highlighting and underline annotation tools.
-This app allows users to open a PDF, highlight text, underline content, and (optionally) save their annotations locally.
+A desktop PDF reader built using Electron and pdf.js, featuring text highlighting and underline annotation tools.
+This app allows users to open a PDF, highlight text, underline content, and save their annotations locally.
 
 🚀 Features
 
-✅ Render PDF files using pdf.js
-✅ Add highlight and underline annotations
-✅ Switch modes easily with toolbar buttons
-✅ Lightweight and fast Electron-based desktop app
-✅ (Optional) Save annotations in localStorage
+Basic Features  : 
+1. A multi-tabbed interface for viewing PDFs with page thumbnails, 
+bookmarks, and text search. 
+2. A comprehensive annotation suite with tools for highlighting, underlining, 
+and adding sticky notes. 
+3. The ability to save and export all annotations. 
+4. Reader comfort modes, including Dark Mode and a full-screen view. 
+
+Advanced Features : 
+1. An interactive Q&A feature to ask natural language questions about the 
+document. 
+2. A text-to-speech feature to read the document's text aloud. 
+3. A built-in dictionary and the ability to translate selected text. 
 
 🧩 Tech Stack
 
