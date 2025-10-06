@@ -248,3 +248,27 @@ body {
     vertical-align: middle;
     filter: invert(0); /* white SVGs → black; toggle in dark mode */
   }
+
+  /* PDF.js text layer positioning so text stays in-place and selectable */
+  .page-wrapper { position: relative; }
+  .textLayer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: auto;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    overflow: hidden;
+  }
+  .textLayer > span,
+  .textLayer > div {
+    position: absolute;
+    transform-origin: 0% 0%;
+    white-space: pre;
+  }
+  /* Optional: clearer selection background */
+  .textLayer ::selection { background: rgba(180, 213, 255, 0.35); }
+  .textLayer ::-moz-selection { background: rgba(180, 213, 255, 0.35); }

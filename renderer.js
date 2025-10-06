@@ -12,6 +12,7 @@ import * as UserBookmarks from './features/bookmarks.js';
 import * as UserHighlights from './features/highlights.js';
 import * as UserUnderlines from './features/underlines.js';
 import * as UserStickynotes from './features/stickynotes.js';
+import { ensureOCRTextLayer } from './build/ocr.js';
 
 // Core PDF functionality
 async function loadPDF(filePath) {
@@ -163,13 +164,34 @@ async function buildTextLayer(wrapper, page, viewport) {
   wrapper.appendChild(textLayerDiv);
 
   const textContent = await page.getTextContent();
-  const task = pdfjsLib.renderTextLayer({
-    textContentSource: textContent,
-    container: textLayerDiv,
-    viewport,
-    textDivs: []
-  });
-  await task.promise;
+  const hasText = Array.isArray(textContent.items) && textContent.items.length > 0;
+  if (hasText) {
+    const task = pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: textLayerDiv,
+      viewport,
+      textDivs: []
+    });
+    await task.promise;
+  } else {
+    // Fallback to OCR for image-based PDFs
+    const fileKey = pdfDocs[currentTab]?.filePath;
+    const pageNumber = page.pageNumber;
+    const canvas = wrapper.querySelector('canvas');
+    // Remove the empty textLayer we created, OCR renderer will recreate appropriately
+    textLayerDiv.remove();
+    if (fileKey && canvas) {
+      await ensureOCRTextLayer(
+        wrapper,
+        canvas,
+        viewport.width,
+        viewport.height,
+        fileKey,
+        pageNumber,
+        'eng'
+      );
+    }
+  }
 }
 
 function getCurrentWrapperAndPage() {
