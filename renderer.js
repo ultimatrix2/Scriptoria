@@ -118,7 +118,194 @@ async function renderSingleCanvas(canvas, pdf, pageNumber, scale, rotation) {
   const ctx = canvas.getContext('2d');
   canvas.height = viewport.height;
   canvas.width = viewport.width;
+  // Ensure the canvas is wrapped with a positioned container for overlay layers
+  let wrapper = canvas.parentElement;
+  if (!wrapper || !wrapper.classList || !wrapper.classList.contains('page-wrapper')) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'page-wrapper';
+    wrapper.style.position = 'relative';
+    wrapper.style.width = `${viewport.width}px`;
+    wrapper.style.height = `${viewport.height}px`;
+    canvas.replaceWith(wrapper);
+    wrapper.appendChild(canvas);
+  } else {
+    wrapper.style.width = `${viewport.width}px`;
+    wrapper.style.height = `${viewport.height}px`;
+  }
+
+  // Render page bitmap
   await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Build or update invisible selectable text layer
+  await buildTextLayer(wrapper, page, viewport);
+
+  // Draw stored annotations (highlights and underlines)
+  drawAnnotations(wrapper, pageNumber, viewport.width, viewport.height);
+}
+
+// Build invisible selectable text layer for a page
+async function buildTextLayer(wrapper, page, viewport) {
+  // Remove existing text layer if any
+  const old = wrapper.querySelector('.textLayer');
+  if (old) old.remove();
+  const textLayerDiv = document.createElement('div');
+  textLayerDiv.className = 'textLayer';
+  textLayerDiv.style.position = 'absolute';
+  textLayerDiv.style.left = '0';
+  textLayerDiv.style.top = '0';
+  textLayerDiv.style.width = `${viewport.width}px`;
+  textLayerDiv.style.height = `${viewport.height}px`;
+  textLayerDiv.style.pointerEvents = 'auto';
+  textLayerDiv.style.color = 'transparent';
+  textLayerDiv.style.userSelect = 'text';
+  textLayerDiv.style.webkitUserSelect = 'text';
+  textLayerDiv.style.MozUserSelect = 'text';
+  wrapper.appendChild(textLayerDiv);
+
+  const textContent = await page.getTextContent();
+  const task = pdfjsLib.renderTextLayer({
+    textContentSource: textContent,
+    container: textLayerDiv,
+    viewport,
+    textDivs: []
+  });
+  await task.promise;
+}
+
+function getCurrentWrapperAndPage() {
+  const container = document.getElementById('canvas-container');
+  // pick current visible canvas by current page number
+  const { pageNum } = pdfDocs[currentTab] || { pageNum: 1 };
+  // wrappers are in same order as canvases
+  const wrappers = Array.from(container.querySelectorAll('.page-wrapper'));
+  const wrapper = viewMode === 'single' ? wrappers[0] : wrappers[pageNum - 1] || wrappers[0];
+  return { wrapper, pageNum };
+}
+
+function selectionRectsRelativeToWrapper(wrapper) {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return [];
+  const ranges = [];
+  for (let i = 0; i < sel.rangeCount; i++) {
+    ranges.push(sel.getRangeAt(i));
+  }
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const rects = [];
+  for (const range of ranges) {
+    const clientRects = Array.from(range.getClientRects());
+    for (const r of clientRects) {
+      // Only accept rects that intersect the wrapper (same page)
+      const intersects = !(r.right < wrapperRect.left || r.left > wrapperRect.right || r.bottom < wrapperRect.top || r.top > wrapperRect.bottom);
+      if (!intersects) continue;
+      rects.push({
+        x: r.left - wrapperRect.left,
+        y: r.top - wrapperRect.top,
+        w: r.width,
+        h: r.height
+      });
+    }
+  }
+  return rects;
+}
+
+function normalizeRects(rects, pageWidth, pageHeight) {
+  return rects.map(r => ({
+    x: r.x / pageWidth,
+    y: r.y / pageHeight,
+    w: r.w / pageWidth,
+    h: r.h / pageHeight
+  }));
+}
+
+function denormalizeRects(rects, pageWidth, pageHeight) {
+  return rects.map(r => ({
+    x: r.x * pageWidth,
+    y: r.y * pageHeight,
+    w: r.w * pageWidth,
+    h: r.h * pageHeight
+  }));
+}
+
+function ensureOverlay(wrapper) {
+  let overlay = wrapper.querySelector('.annotationLayer');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'annotationLayer';
+    overlay.style.position = 'absolute';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.pointerEvents = 'none';
+    wrapper.appendChild(overlay);
+  }
+  return overlay;
+}
+
+function drawAnnotations(wrapper, pageNumber, pageWidth, pageHeight) {
+  const overlay = ensureOverlay(wrapper);
+  overlay.innerHTML = '';
+  const fileKey = pdfDocs[currentTab]?.filePath;
+  if (!fileKey) return;
+  const allHighlightsRaw = UserHighlights.getAll(fileKey);
+  const allUnderlinesRaw = UserUnderlines.getAll(fileKey);
+  const allHighlights = allHighlightsRaw
+    .map((a, idx) => ({ a, idx }))
+    .filter(({ a }) => a.page === pageNumber && (a.type === 'highlight' || !a.type));
+  const allUnderlines = allUnderlinesRaw
+    .map((a, idx) => ({ a, idx }))
+    .filter(({ a }) => a.page === pageNumber);
+
+  for (const { a: ann, idx } of allHighlights) {
+    const rects = denormalizeRects(ann.rects, pageWidth, pageHeight);
+    for (const r of rects) {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.left = `${r.x}px`;
+      div.style.top = `${r.y}px`;
+      div.style.width = `${r.w}px`;
+      div.style.height = `${r.h}px`;
+      div.style.background = (ann.color || '#ffff0066');
+      div.style.pointerEvents = 'none';
+      div.dataset.type = 'highlight';
+      div.dataset.index = String(idx);
+      overlay.appendChild(div);
+    }
+  }
+  for (const { a: ann, idx } of allUnderlines) {
+    const rects = denormalizeRects(ann.rects, pageWidth, pageHeight);
+    for (const r of rects) {
+      const line = document.createElement('div');
+      line.style.position = 'absolute';
+      line.style.left = `${r.x}px`;
+      line.style.top = `${r.y + r.h - 2}px`;
+      line.style.width = `${r.w}px`;
+      line.style.height = '2px';
+      line.style.background = ann.color || '#000';
+      line.style.pointerEvents = 'none';
+      line.dataset.type = 'underline';
+      line.dataset.index = String(idx);
+      overlay.appendChild(line);
+    }
+  }
+
+  // Right-click to remove an annotation group (highlight/underline) by index
+  overlay.oncontextmenu = async (e) => {
+    e.preventDefault();
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const type = target.dataset.type;
+    const indexStr = target.dataset.index;
+    const file = pdfDocs[currentTab]?.filePath;
+    if (!type || indexStr == null || !file) return;
+    const idx = parseInt(indexStr);
+    if (type === 'highlight') {
+      await UserHighlights.removeAtIndex(file, idx);
+    } else if (type === 'underline') {
+      await UserUnderlines.removeAtIndex(file, idx);
+    }
+    drawAnnotations(wrapper, pageNumber, pageWidth, pageHeight);
+  };
 }
 
 function createTab(fileName) {
@@ -348,11 +535,40 @@ async function searchInPDF(query) {
 }
 
 // Highlight function
-function highlightSelection() {
-  const selection = window.getSelection().toString();
-  if (!selection) return;
-  alert(`Highlighted: ${selection}`);
-  // later we can draw yellow overlay rects
+async function highlightSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const { wrapper, pageNum } = getCurrentWrapperAndPage();
+  if (!wrapper) return;
+  const pageWidth = wrapper.clientWidth;
+  const pageHeight = wrapper.clientHeight;
+  const rects = selectionRectsRelativeToWrapper(wrapper);
+  if (rects.length === 0) return;
+  const normalized = normalizeRects(rects, pageWidth, pageHeight);
+  const fileKey = pdfDocs[currentTab]?.filePath;
+  if (!fileKey) return;
+  await UserHighlights.upsert(fileKey, { page: pageNum, type: 'highlight', rects: normalized, color: '#ffff0066' });
+  // Clear selection and redraw
+  sel.removeAllRanges();
+  drawAnnotations(wrapper, pageNum, pageWidth, pageHeight);
+}
+
+async function underlineSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const { wrapper, pageNum } = getCurrentWrapperAndPage();
+  if (!wrapper) return;
+  const pageWidth = wrapper.clientWidth;
+  const pageHeight = wrapper.clientHeight;
+  const rects = selectionRectsRelativeToWrapper(wrapper);
+  if (rects.length === 0) return;
+  const normalized = normalizeRects(rects, pageWidth, pageHeight);
+  const fileKey = pdfDocs[currentTab]?.filePath;
+  if (!fileKey) return;
+  await UserUnderlines.add(fileKey, { page: pageNum, rects: normalized, color: '#000000' });
+  // Clear selection and redraw
+  sel.removeAllRanges();
+  drawAnnotations(wrapper, pageNum, pageWidth, pageHeight);
 }
 
 // Add Text function
@@ -521,6 +737,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rotate-right').addEventListener('click', rotateRight);
   document.getElementById('fullscreen').addEventListener('click', toggleFullscreen);
   document.getElementById('highlight').addEventListener('click', highlightSelection);
+  document.getElementById('underline')?.addEventListener('click', underlineSelection);
+  document.getElementById('save')?.addEventListener('click', async () => {
+    const fileKey = pdfDocs[currentTab]?.filePath;
+    if (!fileKey) return;
+    // Force-save: rewrite current in-memory stores back to disk
+    await UserHighlights.replaceAll(fileKey, UserHighlights.getAll(fileKey));
+    await UserUnderlines.replaceAll(fileKey, UserUnderlines.getAll(fileKey));
+    // bookmarks are saved on toggle already, but no-op ensures files exist
+    // No explicit call needed as bookmarks module persists on changes
+    alert('Annotations saved.');
+  });
   document.getElementById('add-text').addEventListener('click', () => {
     const userText = prompt("Enter text to add:");
     if (userText) addTextAnnotation(userText);

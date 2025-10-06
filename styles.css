@@ -152,7 +152,7 @@ body {
   }
   
   #controls {
-    margin: 0;
+    margin: 5px;
     padding: 10px;
     position: sticky;
     top: 0;
@@ -242,3 +242,9 @@ body {
     cursor: move;
   }
   
+  .icon {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    filter: invert(0); /* white SVGs → black; toggle in dark mode */
+  }

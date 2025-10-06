@@ -25,3 +25,12 @@ export async function replaceAll(fileKey, entries) {
   await window.electronAPI?.writeAnnotations?.(fileKey, 'underlines', MEMORY.get(fileKey));
 }
 
+export async function removeAtIndex(fileKey, index) {
+  const arr = MEMORY.get(fileKey) || [];
+  if (index >= 0 && index < arr.length) {
+    arr.splice(index, 1);
+    MEMORY.set(fileKey, arr);
+    await window.electronAPI?.writeAnnotations?.(fileKey, 'underlines', arr);
+  }
+}
+
