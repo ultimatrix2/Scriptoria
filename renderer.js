@@ -13,8 +13,9 @@ import * as UserHighlights from './features/highlights.js';
 import * as UserUnderlines from './features/underlines.js';
 import * as UserStickynotes from './features/stickynotes.js';
 import { ensureOCRTextLayer, getOCRPageText } from './build/ocr.js';
-import { setPageText, appendToPageText } from './features/text-store.js';
+import { setPageText, appendToPageText, getPageText } from './features/text-store.js';
 import { exportCurrentWithAnnotations } from './advance/exportToPdf.js';
+import { speakSelection, speakPage, stop, getSpeakingState } from './features/tts.js';
 
 // Core PDF functionality
 async function loadPDF(filePath) {
@@ -590,26 +591,44 @@ async function generateBookmarkThumbnails(docIndex) {
   }
 }
 
-// Search inside PDF
+// Search inside PDF using text-store
 async function searchInPDF(query) {
-  const { pdf } = pdfDocs[currentTab];
+  const currentDoc = pdfDocs[currentTab];
+  if (!currentDoc) return;
+  
   const resultsContainer = document.getElementById("search-results");
   resultsContainer.innerHTML = "";
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const text = textContent.items.map((s) => s.str).join(" ");
+  if (!query.trim()) return;
 
+  const filePath = currentDoc.filePath;
+  const { pdf } = currentDoc;
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    // Use text-store instead of PDF.js text extraction
+    const text = getPageText(filePath, i);
+    
     if (text.toLowerCase().includes(query.toLowerCase())) {
       const result = document.createElement("div");
       result.textContent = `Found on page ${i}`;
       result.classList.add("search-result");
+      result.style.cursor = "pointer";
+      result.style.padding = "8px";
+      result.style.borderBottom = "1px solid #eee";
       result.addEventListener("click", () => {
         goToPage(i);
       });
       resultsContainer.appendChild(result);
     }
+  }
+  
+  // Show message if no results found
+  if (resultsContainer.children.length === 0) {
+    const noResults = document.createElement("div");
+    noResults.textContent = "No results found";
+    noResults.style.padding = "8px";
+    noResults.style.color = "#666";
+    resultsContainer.appendChild(noResults);
   }
 }
 
@@ -1030,5 +1049,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Translation/TTS feature removed
+  // TTS functionality tab click (toggle start/stop)
+  document.getElementById('translation-tab')?.addEventListener('click', () => {
+    // If currently speaking, stop it
+    if (getSpeakingState()) {
+      stop();
+      return;
+    }
+
+    const fileKey = pdfDocs[currentTab]?.filePath;
+    if (!fileKey) {
+      alert('No PDF loaded. Please open a PDF first.');
+      return;
+    }
+
+    // Check if there's a text selection
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    if (selectedText) {
+      // Speak selected text
+      speakSelection();
+    } else {
+      // Speak current page
+      const currentPage = pdfDocs[currentTab]?.pageNum || 1;
+      speakPage(fileKey, currentPage);
+    }
+  });
 });

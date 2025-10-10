@@ -5,10 +5,14 @@ async function fetchDefinition(term) {
 
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query)}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error('Dictionary API error:', res.status, res.statusText);
+      return null;
+    }
     const data = await res.json();
     return Array.isArray(data) ? data : null;
-  } catch {
+  } catch (error) {
+    console.error('Dictionary fetch error:', error);
     return null;
   }
 }
@@ -126,6 +130,7 @@ async function showDictionaryForSelection() {
   content.textContent = 'Looking up definition…';
 
   const data = await fetchDefinition(text);
+  console.log('Dictionary API response for:', text, data);
   renderDefinitions(popup, text, data);
 }
 
