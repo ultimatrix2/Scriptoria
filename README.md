@@ -1,39 +1,38 @@
-Scriptoria : PDF Reader
+#  Scriptoria:
 
-A desktop PDF reader built using Electron and pdf.js, featuring text highlighting and underline annotation tools.
-This app allows users to open a PDF, highlight text, underline content, and save their annotations locally.
+Scriptoria is a **advanced Desktop PDF Reader with Annotations** built using **Electron** and **pdf.js**, featuring rich annotation tools like **highlighting**, **underlining**, **Bookmarks**, and advanced **text-to-speech (TTS)** & **interactive Q&A** capabilities. It helps users read, annotate, and interact with PDFs seamlessly.
 
-🚀 Features
+This project bridges the gap between reading and interactive learning by providing a **full-featured annotation suite** with AI-powered features.
 
-Basic Features  : 
-1. A multi-tabbed interface for viewing PDFs with page thumbnails, 
-bookmarks, and text search. 
-2. A comprehensive annotation suite with tools for highlighting, underlining, 
-and adding sticky notes. 
-3. The ability to save and export all annotations. 
-4. Reader comfort modes, including Dark Mode and a full-screen view. 
+---
 
-Advanced Features : 
-1. An interactive Q&A feature to ask natural language questions about the 
-document. 
-2. A text-to-speech feature to read the document's text aloud. 
-3. A built-in dictionary and the ability to translate selected text. 
+##  Features
 
-🧩 Tech Stack
+###  Basic Features
 
-Electron – for building the desktop application
+-  Multi-tabbed interface for viewing PDFs with **page thumbnails**, **bookmarks**, and **text search**
+-  Annotation tools: **Highlight**, **Underline**, **Bookmarks**
+-  Save and export annotations locally
+-  Reader comfort modes: **Dark Mode** and **Full-Screen View**
 
-pdf.js – for rendering PDF pages
+###  Advanced Features
 
-HTML, CSS, JavaScript – for UI and interaction logic
+-  **Interactive Q&A**: Ask natural language questions about the document
+-  **Text-to-Speech**: Read PDF content aloud
+-  Built-in **dictionary** and **translation** for selected text
 
-📦 Installation & Setup
-1️⃣ Clone the Repository
-git clone https://github.com/your-username/electron-pdf-reader.git
-cd electron-pdf-reader
+---
 
-2️⃣ Install Dependencies
-npm install
+## 🛠 Tech Stack
 
-3️⃣ Run the App
-npm start
+| Layer      | Technology                         |
+|------------|------------------------------------|
+| Desktop    | Electron                           |
+| PDF Render | pdf.js                             |
+| Frontend   | HTML, CSS, JavaScript              |
+| Utilities  | Node.js, File System APIs           |
+
+---
+
+##  Folder Structure
+
