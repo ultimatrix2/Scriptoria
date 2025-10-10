@@ -1,11 +1,11 @@
-// Simple OCR helper using Tesseract.js via CDN dynamic import.
-// Exposes a cache so we don't re-run OCR on every zoom; boxes are stored normalized.
-
-const ocrCache = new Map(); // key: `${filePath}::${pageNumber}` -> { width, height, words: [{ text, x, y, w, h }] normalized 0..1 }
+// using cache so we don't  have to re-run OCR on every zoom; boxes are stored normalized.
+// still need to work on this ;  chekc again
+ 
+const ocrCache = new Map();  // key: `${filePath}::${pageNumber}` -> { width, height, words: [{ text, x, y, w, h }] normalized 0..1 }
 
 async function getTesseract() {
   if (globalThis.Tesseract) return globalThis.Tesseract;
-  // Load from CDN lazily in renderer
+  
   await import('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
   return globalThis.Tesseract;
 }
@@ -106,6 +106,32 @@ export async function ensureOCRTextLayer(wrapper, canvas, pageWidthPx, pageHeigh
     await runOCROnCanvasAndCache(filePath, pageNumber, canvas, lang);
   }
   return renderOCRTextLayerFromCache(wrapper, pageWidthPx, pageHeightPx, filePath, pageNumber);
+}
+
+// Return concatenated OCR text for a page if cached; otherwise empty string
+export function getOCRPageText(filePath, pageNumber) {
+  const key = `${filePath}::${pageNumber}`;
+  const cached = ocrCache.get(key);
+  if (!cached) return '';
+  // Join words respecting original left-to-right grouping best-effort by sorting by y then x
+  const words = Array.from(cached.words || []);
+  words.sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y));
+  return words.map(w => w.text).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+// Return concatenated OCR text for an entire document from cache (pages encountered so far)
+export function getOCRDocumentText(filePath) {
+  const prefix = `${filePath}::`;
+  const entries = Array.from(ocrCache.keys())
+    .filter(k => k.startsWith(prefix))
+    .map(k => {
+      const page = Number(k.slice(prefix.length));
+      return [page, ocrCache.get(k)];
+    })
+    .filter(([, v]) => v && Array.isArray(v.words));
+  entries.sort((a, b) => a[0] - b[0]);
+  const pageTexts = entries.map(([page, _]) => getOCRPageText(filePath, page));
+  return pageTexts.filter(Boolean).join('\n\n');
 }
 
 

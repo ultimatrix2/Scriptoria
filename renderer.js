@@ -12,7 +12,9 @@ import * as UserBookmarks from './features/bookmarks.js';
 import * as UserHighlights from './features/highlights.js';
 import * as UserUnderlines from './features/underlines.js';
 import * as UserStickynotes from './features/stickynotes.js';
-import { ensureOCRTextLayer } from './build/ocr.js';
+import { ensureOCRTextLayer, getOCRPageText } from './build/ocr.js';
+import { setPageText, appendToPageText } from './features/text-store.js';
+import { speakSelection, speakPage, speakDocument, stop, getSpeakingState } from './features/tts.js';
 
 // Core PDF functionality
 async function loadPDF(filePath) {
@@ -83,7 +85,7 @@ async function renderPage() {
     await renderSingleCanvas(canvas, pdf, pageNum, scale, rotation);
   } else if (viewMode === 'split') {
     const firstCanvas = document.createElement('canvas');
-    const secondCanvas = document.createElement('canvas');
+    const secondCanvas = document.createElement('canvas');  
     container.appendChild(firstCanvas);
     container.appendChild(secondCanvas);
     await renderSingleCanvas(firstCanvas, pdf, pageNum, scale, rotation);
@@ -140,6 +142,25 @@ async function renderSingleCanvas(canvas, pdf, pageNumber, scale, rotation) {
   // Build or update invisible selectable text layer
   await buildTextLayer(wrapper, page, viewport);
 
+  // Extract and store text for this page from PDF.js or OCR fallback
+  try {
+    const textContent = await page.getTextContent();
+    const items = Array.isArray(textContent.items) ? textContent.items : [];
+    const extracted = items.map(i => (i.str || '')).join(' ').replace(/\s+/g, ' ').trim();
+    const fileKey = pdfDocs[currentTab]?.filePath;
+    if (fileKey) {
+      if (extracted && extracted.length > 0) {
+        setPageText(fileKey, pageNumber, extracted);
+      } else {
+        // use OCR cache if available
+        const ocrText = getOCRPageText(fileKey, pageNumber);
+        if (ocrText) setPageText(fileKey, pageNumber, ocrText);
+      }
+    }
+  } catch (e) {
+    // Silent failure: text extraction is best-effort
+  }
+
   // Draw stored annotations (highlights and underlines)
   drawAnnotations(wrapper, pageNumber, viewport.width, viewport.height);
 }
@@ -173,6 +194,16 @@ async function buildTextLayer(wrapper, page, viewport) {
       textDivs: []
     });
     await task.promise;
+    // Also push extracted PDF.js text into the store where possible
+    try {
+      const fileKey = pdfDocs[currentTab]?.filePath;
+      if (fileKey) {
+        const extracted = (textContent.items || []).map(i => (i.str || '')).join(' ').replace(/\s+/g, ' ').trim();
+        if (extracted) {
+          setPageText(fileKey, page.pageNumber, extracted);
+        }
+      }
+    } catch {}
   } else {
     // Fallback to OCR for image-based PDFs
     const fileKey = pdfDocs[currentTab]?.filePath;
@@ -411,10 +442,19 @@ function closeTab(index) {
 
 // Generate Thumbnails
 async function generateThumbnailsForDoc(docIndex) {
+  console.log('generateThumbnailsForDoc called with docIndex:', docIndex);
   const target = pdfDocs[docIndex];
-  if (!target) return;
+  if (!target) {
+    console.error('No PDF document found at index:', docIndex);
+    return;
+  }
   const pdf = target.pdf;
   const thumbContainer = document.getElementById("thumbnails");
+  if (!thumbContainer) {
+    console.error('Thumbnails container not found');
+    return;
+  }
+  console.log('Generating thumbnails for', pdf.numPages, 'pages');
   thumbContainer.innerHTML = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -658,14 +698,26 @@ function toggleFullscreen() {
 
 // Zoom functionality
 function zoomIn() {
-  if (!pdfDocs[currentTab]) return;
+  console.log('zoomIn called, currentTab:', currentTab, 'pdfDocs length:', pdfDocs.length);
+  if (!pdfDocs[currentTab]) {
+    console.error('No PDF document at current tab:', currentTab);
+    return;
+  }
+  const oldScale = pdfDocs[currentTab].scale;
   pdfDocs[currentTab].scale = Math.min(pdfDocs[currentTab].scale * 1.2, 5.0);
+  console.log('Zoom in: scale changed from', oldScale, 'to', pdfDocs[currentTab].scale);
   renderPage();
 }
 
 function zoomOut() {
-  if (!pdfDocs[currentTab]) return;
+  console.log('zoomOut called, currentTab:', currentTab, 'pdfDocs length:', pdfDocs.length);
+  if (!pdfDocs[currentTab]) {
+    console.error('No PDF document at current tab:', currentTab);
+    return;
+  }
+  const oldScale = pdfDocs[currentTab].scale;
   pdfDocs[currentTab].scale = Math.max(pdfDocs[currentTab].scale / 1.2, 0.2);
+  console.log('Zoom out: scale changed from', oldScale, 'to', pdfDocs[currentTab].scale);
   renderPage();
 }
 
@@ -715,10 +767,21 @@ async function goToPageOnDoc(docIndex, pageNumber) {
 
 // Sidebar tab functionality
 function showSidebarTab(target) {
-  document.querySelectorAll('#sidebar-content > div').forEach(div => {
+  console.log('showSidebarTab called with target:', target);
+  const sidebarContent = document.querySelectorAll('#sidebar-content > div');
+  console.log('Found sidebar content divs:', sidebarContent.length);
+  
+  sidebarContent.forEach(div => {
     div.style.display = 'none';
   });
-  document.getElementById(target).style.display = 'block';
+  
+  const targetElement = document.getElementById(target);
+  if (targetElement) {
+    targetElement.style.display = 'block';
+    console.log('Set', target, 'to display block');
+  } else {
+    console.error('Target element not found:', target);
+  }
 }
 
 // Drag and drop functionality
@@ -744,6 +807,8 @@ function setupDragAndDrop() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM Content Loaded - Setting up event listeners');
+  
   // Toolbar buttons
   document.getElementById('open').addEventListener('click', async () => {
     const filePath = await window.electronAPI.openFile();
@@ -770,14 +835,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // No explicit call needed as bookmarks module persists on changes
     alert('Annotations saved.');
   });
-  document.getElementById('add-text').addEventListener('click', () => {
+  document.getElementById('add-text')?.addEventListener('click', () => {
     const userText = prompt("Enter text to add:");
     if (userText) addTextAnnotation(userText);
   });
 
-  // Zoom controls
-  document.getElementById('zoom-in').addEventListener('click', zoomIn);
-  document.getElementById('zoom-out').addEventListener('click', zoomOut);
+  // Zoom controls - Add null checks and debugging
+  const zoomInBtn = document.getElementById('zoom-in');
+  const zoomOutBtn = document.getElementById('zoom-out');
+  
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener('click', () => {
+      console.log('Zoom In clicked');
+      zoomIn();
+    });
+  } else {
+    console.error('Zoom In button not found');
+  }
+  
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener('click', () => {
+      console.log('Zoom Out clicked');
+      zoomOut();
+    });
+  } else {
+    console.error('Zoom Out button not found');
+  }
 
   // View mode buttons
   const canvasContainer = document.getElementById('canvas-container');
@@ -838,10 +921,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Sidebar tabs
-    const sidebarButtons = document.querySelectorAll('.tab-buttons button');
+  const sidebarButtons = document.querySelectorAll('.tab-buttons button');
+  console.log('Found sidebar buttons:', sidebarButtons.length);
+  
   sidebarButtons.forEach(button => {
     button.addEventListener('click', () => {
       const target = button.getAttribute('data-target');
+      console.log('Sidebar tab clicked:', target);
       showSidebarTab(target);
       // active state
       sidebarButtons.forEach(b => b.classList.remove('active'));
@@ -851,12 +937,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target === 'bookmarks') {
         const docIndex = typeof thumbnailsDocIndex === 'number' ? thumbnailsDocIndex : currentTab;
         generateBookmarkThumbnails(docIndex);
+      } else if (target === 'thumbnails') {
+        // When switching back to thumbnails, regenerate normal thumbnails
+        const docIndex = typeof thumbnailsDocIndex === 'number' ? thumbnailsDocIndex : currentTab;
+        if (docIndex !== null && pdfDocs[docIndex]) {
+          generateThumbnailsForDoc(docIndex);
+        }
       }
     });
   });
+  
   // Set initial active tab
   const firstSidebarBtn = document.querySelector('.tab-buttons button[data-target="thumbnails"]');
-  if (firstSidebarBtn) firstSidebarBtn.classList.add('active');
+  if (firstSidebarBtn) {
+    firstSidebarBtn.classList.add('active');
+    console.log('Set initial active tab to thumbnails');
+    // Ensure thumbnails section is visible by default
+    showSidebarTab('thumbnails');
+  } else {
+    console.error('Thumbnails button not found');
+  }
 
   // Search functionality
   document.getElementById("search-input")?.addEventListener("input", (e) => {
@@ -865,4 +965,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup drag and drop
   setupDragAndDrop();
+
+  // Ensure zoom and thumbnails work even if there are issues
+  console.log('Final check - ensuring all elements are properly set up');
+  
+  // Double-check zoom buttons
+  const zoomInFinal = document.getElementById('zoom-in');
+  const zoomOutFinal = document.getElementById('zoom-out');
+  console.log('Final zoom button check - In:', !!zoomInFinal, 'Out:', !!zoomOutFinal);
+  
+  // Double-check sidebar
+  const sidebar = document.getElementById('sidebar');
+  const thumbnails = document.getElementById('thumbnails');
+  console.log('Final sidebar check - Sidebar:', !!sidebar, 'Thumbnails:', !!thumbnails);
+  
+  // Expose test functions to global scope for debugging
+  window.testZoom = () => {
+    console.log('Testing zoom functionality...');
+    if (pdfDocs.length > 0) {
+      console.log('PDF loaded, testing zoom in');
+      zoomIn();
+    } else {
+      console.log('No PDF loaded, cannot test zoom');
+    }
+  };
+  
+  window.testThumbnails = () => {
+    console.log('Testing thumbnails functionality...');
+    if (pdfDocs.length > 0) {
+      console.log('PDF loaded, regenerating thumbnails');
+      generateThumbnailsForDoc(currentTab);
+    } else {
+      console.log('No PDF loaded, cannot test thumbnails');
+    }
+  };
+
+  // TTS functionality tab click (toggle start/stop)
+  document.getElementById('translation-tab')?.addEventListener('click', () => {
+    // If currently speaking, stop it
+    if (getSpeakingState()) {
+      stop();
+      return;
+    }
+
+    const fileKey = pdfDocs[currentTab]?.filePath;
+    if (!fileKey) {
+      alert('No PDF loaded. Please open a PDF first.');
+      return;
+    }
+
+    // Check if there's a text selection
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    if (selectedText) {
+      // Speak selected text
+      speakSelection();
+    } else {
+      // Speak current page
+      const currentPage = pdfDocs[currentTab]?.pageNum || 1;
+      speakPage(fileKey, currentPage);
+    }
+  });
 });

@@ -116,6 +116,8 @@ body {
     border-right: 1px solid #ccc;
     overflow-y: auto;
     background: var(--toolbar-bg);
+    display: block !important;
+    visibility: visible !important;
   }
   /* Sidebar nav as single-line bar */
   .tab-buttons {
@@ -126,13 +128,12 @@ body {
     z-index: 5;
     background: var(--toolbar-bg);
     border-bottom: 1px solid #ccc;
-    font-size: 30px;
+    font-size: 14px;
   }
   .tab-buttons button {
     flex: 1;
     padding: 6px 8px;
     border: 1px solid #ccc;
-   
     background: #fff;
     cursor: pointer;
   }
@@ -226,6 +227,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 8px;
+    min-height: 100px;
   }
   #thumbnails canvas {
     width: 100%;

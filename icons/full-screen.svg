@@ -1,8 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M6 9.99739C6.01447 8.29083 6.10921 7.35004 6.72963 6.72963C7.35004 6.10921 8.29083 6.01447 9.99739 6" stroke="#1C274C" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M6 14.0007C6.01447 15.7072 6.10921 16.648 6.72963 17.2684C7.35004 17.8888 8.29083 17.9836 9.99739 17.998" stroke="#1C274C" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M17.9976 9.99739C17.9831 8.29083 17.8883 7.35004 17.2679 6.72963C16.6475 6.10921 15.7067 6.01447 14.0002 6" stroke="#1C274C" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M17.9976 14.0007C17.9831 15.7072 17.8883 16.648 17.2679 17.2684C16.6475 17.8888 15.7067 17.9836 14.0002 17.998" stroke="#1C274C" stroke-width="1.5" stroke-linecap="round"/>
-<path opacity="0.5" d="M2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C22 4.92893 22 7.28595 22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12Z" stroke="#1C274C" stroke-width="1.5"/>
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg fill="#000000" height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 viewBox="0 0 512 512" xml:space="preserve">
+<g>
+	<g>
+		<path d="M0,0v512h512V0H0z M195.048,420.571v36.571H54.857v-140.19h36.571v77.762l102.88-102.88l25.86,25.86L117.291,420.571
+			H195.048z M194.309,220.17L91.429,117.291v77.757H54.857V54.857h140.19v36.571h-77.762L220.169,194.31L194.309,220.17z
+			 M457.143,457.143h-140.19v-36.571h77.757l-102.878-102.88l25.86-25.86l102.88,102.883v-77.762h36.571V457.143z M457.143,195.048
+			h-36.571v-77.757l-102.88,102.88l-25.86-25.86L394.714,91.429h-77.762V54.857h140.19V195.048z"/>
+	</g>
+</g>
 </svg>

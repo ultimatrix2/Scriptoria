@@ -19,20 +19,20 @@
     <button id="rotate-right"><img src="icons/right-rotate.svg" alt="rotate-right" class="icon" /> Rotate</button>
     <button id="highlight"><img src="icons/highlight.svg" alt="highlight" class="icon" />Highlight</button>
     <button id="underline"><img src="icons/underline.svg" alt="underline" class="icon" /> Underline</button>
-    <button id="add-text"><img src="icons/write.svg" alt="Open" class="icon" />Add Text</button>
-    <button id="dictionary">📘 Dictionary</button>
-    <button id="fullscreen"><img src="icons/full-screen.svg" alt="fullscreen" class="icon" /> Fullscreen</button>
+    <!-- <button id="add-text"><img src="icons/write.svg" alt="Open" class="icon" /> Add Text</button> -->
+    <button id="dictionary"><img src="icons/dictionary.svg" alt="dictionary" class="icon" />  Dictionary</button>
+    <!-- <button id="fullscreen"><img src="icons/full-screen.svg" alt="fullscreen" class="icon" /> Fullscreen</button> -->
     <button id="dark-mode-toggle">
       <img src="icons/day.svg" alt="Open" class="icon" /> / 
       <img src="icons/night.svg" alt="Open" class="icon" /> Mode</button>
   </div>
 
-  <!--  Multiple pdfs tabs container -->
+  <!-- containing multiple pdfs tabs (container) -->
   <div id="tabs-container">
     <ul id="tabs"></ul>
   </div>
 
-  <!-- Main Layout : playground ,  (tentative )  -->
+  <!-- main layout : playground  :)   -->
   <div id="layout">
     <!-- Sidebar for thumbnail  , bookmarks , search  -->
     <div id="sidebar">
@@ -69,30 +69,29 @@
     </div>
   </div>
 
-  <!-- hovering button  -->
-   <!-- Dictionary -->
-   <div class="tab-dictionary">
-    <span class="tab-icon"><img src="icons/dictionary.svg" alt="dictionary" class="icon" /></span>
-    <span class="tab-text">Dictionary</span>
-  </div>
+    <!-- Fullscreen  -->
+    <div class="tab-dictionary" id="fullscreen" >
+      <span class="tab-icon"><img src="icons/full-screen.svg" alt="fullscreen" class="icon" /></span>
+      <span class="tab-text">Fullscreen</span>
+    </div>
 
-  <!-- Translation -->
-  <div class="tab-translation">
-    <span class="tab-icon">🌐</span>
-    <span class="tab-text">Translation</span>
-  </div>
+    <!-- Translation -->
+    <div class="tab-translation" id="translation-tab">
+      <span class="tab-icon"><img src="icons/audio-play.svg" alt="audio-on" class="icon" /></span>
+      <span class="tab-text">Audio</span>
+    </div>
 
-  <!-- QnA -->
-  <div class="tab-qna">
-    <span class="tab-icon">❓</span>
-    <span class="tab-text">Q&A</span>
-  </div>
+    <!-- QnA -->
+    <div class="tab-qna">
+      <span class="tab-icon"><img src="icons/question.svg" alt="question" class="icon" /></span>
+      <span class="tab-text">Q&A</span>
+    </div>
 
-  <!-- Summarizer -->
-  <div class="tab-summarizer">
-    <span class="tab-icon">📝</span>
-    <span class="tab-text">Summarizer</span>
-  </div>
+    <!-- Summarizer -->
+    <div class="tab-summarizer">
+      <span class="tab-icon"><img src="icons/notes.svg" alt="notes" class="icon" /></span>
+      <span class="tab-text">Summarizer</span>
+    </div>
     
   <script type="module" src="features/bookmarks.js"></script>
   <script type="module" src="advance/dictionary.js"></script>

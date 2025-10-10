@@ -1,15 +1,14 @@
-// Minimal dictionary integration: get selection, fetch definition, and show popup
-
-// Fetch definition from a public API (dictionaryapi.dev)
+// Dictionary lookup and popup utility
 async function fetchDefinition(term) {
-  const q = term.trim();
-  if (!q) return null;
+  const query = term.trim();
+  if (!query) return null;
+
   try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`);
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query)}`);
     if (!res.ok) return null;
     const data = await res.json();
     return Array.isArray(data) ? data : null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -17,101 +16,98 @@ async function fetchDefinition(term) {
 function getSelectedTextAndRect() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed) return { text: '', rect: null };
+
   const text = selection.toString().trim();
   if (!text) return { text: '', rect: null };
-  let range;
+
   try {
-    range = selection.getRangeAt(0);
-  } catch (_) {
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    return { text, rect };
+  } catch {
     return { text: '', rect: null };
   }
-  const rect = range.getBoundingClientRect();
-  return { text, rect };
 }
 
-function ensurePopupContainer() {
-  let el = document.getElementById('dictionary-popup');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'dictionary-popup';
-    el.style.position = 'fixed';
-    el.style.zIndex = '10000';
-    el.style.maxWidth = '360px';
-    el.style.background = '#fff';
-    el.style.color = '#000';
-    el.style.border = '1px solid #ccc';
-    el.style.borderRadius = '8px';
-    el.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
-    el.style.padding = '10px 12px';
-    el.style.fontFamily = 'Arial, sans-serif';
-    el.style.fontSize = '14px';
-    el.style.lineHeight = '1.4';
-    el.style.display = 'none';
-    el.style.backdropFilter = 'saturate(180%) blur(10px)';
+function ensurePopup() {
+  let popup = document.getElementById('dictionary-popup');
+  if (popup) return popup;
 
-    const close = document.createElement('button');
-    close.textContent = '✖';
-    close.title = 'Close';
-    close.style.position = 'absolute';
-    close.style.top = '6px';
-    close.style.right = '8px';
-    close.style.border = 'none';
-    close.style.background = 'transparent';
-    close.style.cursor = 'pointer';
-    close.style.fontSize = '14px';
-    close.addEventListener('click', () => {
-      el.style.display = 'none';
-    });
-    el.appendChild(close);
+  popup = document.createElement('div');
+  popup.id = 'dictionary-popup';
+  Object.assign(popup.style, {
+    position: 'fixed',
+    zIndex: '10000',
+    maxWidth: '360px',
+    background: '#fff',
+    color: '#000',
+    border: '1px solid #ccc',
+    borderRadius: '8px',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+    padding: '10px 12px',
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '14px',
+    lineHeight: '1.4',
+    display: 'none',
+    backdropFilter: 'saturate(180%) blur(10px)',
+  });
 
-    const content = document.createElement('div');
-    content.id = 'dictionary-popup-content';
-    content.style.paddingRight = '16px';
-    el.appendChild(content);
+  const closeBtn = Object.assign(document.createElement('button'), {
+    textContent: '✖',
+    title: 'Close',
+  });
+  Object.assign(closeBtn.style, {
+    position: 'absolute',
+    top: '6px',
+    right: '8px',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontSize: '14px',
+  });
+  closeBtn.onclick = () => (popup.style.display = 'none');
 
-    document.body.appendChild(el);
-  }
-  return el;
+  const content = document.createElement('div');
+  content.id = 'dictionary-popup-content';
+  content.style.paddingRight = '16px';
+
+  popup.append(closeBtn, content);
+  document.body.appendChild(popup);
+  return popup;
 }
 
-function renderDefinitions(container, term, data) {
-  const c = container.querySelector('#dictionary-popup-content');
-  c.innerHTML = '';
+function renderDefinitions(popup, term, data) {
+  const container = popup.querySelector('#dictionary-popup-content');
+  container.innerHTML = '';
+
   const title = document.createElement('div');
   title.textContent = term;
-  title.style.fontWeight = 'bold';
-  title.style.marginBottom = '8px';
-  c.appendChild(title);
+  title.style.cssText = 'font-weight:bold;margin-bottom:8px;';
+  container.appendChild(title);
 
-  if (!data || data.length === 0) {
-    const p = document.createElement('div');
-    p.textContent = 'No definition found.';
-    c.appendChild(p);
+  if (!data?.length) {
+    container.textContent = 'No definition found.';
     return;
   }
 
-  // Show first entry meanings concisely
-  const entry = data[0];
-  const meanings = Array.isArray(entry.meanings) ? entry.meanings : [];
-  let count = 0;
-  for (const m of meanings) {
-    if (!Array.isArray(m.definitions)) continue;
-    for (const d of m.definitions) {
-      const row = document.createElement('div');
-      row.style.marginBottom = '6px';
-      const pos = m.partOfSpeech ? ` (${m.partOfSpeech})` : '';
-      row.textContent = `•${pos} ${d.definition || ''}`.trim();
-      c.appendChild(row);
-      count += 1;
-      if (count >= 5) break; // limit lines
-    }
-    if (count >= 5) break;
+  const meanings = data[0]?.meanings ?? [];
+  const definitions = meanings.flatMap(m =>
+    (m.definitions || []).map(d => ({
+      pos: m.partOfSpeech,
+      def: d.definition,
+    }))
+  );
+
+  if (!definitions.length) {
+    container.textContent = 'No concise definitions available.';
+    return;
   }
-  if (count === 0) {
-    const p = document.createElement('div');
-    p.textContent = 'No concise definitions available.';
-    c.appendChild(p);
-  }
+
+  definitions.slice(0, 5).forEach(({ pos, def }) => {
+    const div = document.createElement('div');
+    div.style.marginBottom = '6px';
+    div.textContent = `• (${pos || '—'}) ${def}`;
+    container.appendChild(div);
+  });
 }
 
 async function showDictionaryForSelection() {
@@ -120,28 +116,20 @@ async function showDictionaryForSelection() {
     alert('Select some text first.');
     return;
   }
-  const popup = ensurePopupContainer();
-  // Position near selection
-  const top = Math.max(8, (rect?.top || 0) - 8);
-  const left = Math.max(8, (rect?.left || 0));
-  popup.style.top = `${top}px`;
-  popup.style.left = `${left}px`;
-  popup.style.display = 'block';
 
-  const c = popup.querySelector('#dictionary-popup-content');
-  c.textContent = 'Looking up definition…';
+  const popup = ensurePopup();
+  popup.style.display = 'block';
+  popup.style.top = `${Math.max(8, (rect?.top || 0) - 8)}px`;
+  popup.style.left = `${Math.max(8, rect?.left || 0)}px`;
+
+  const content = popup.querySelector('#dictionary-popup-content');
+  content.textContent = 'Looking up definition…';
 
   const data = await fetchDefinition(text);
   renderDefinitions(popup, text, data);
 }
 
-// Wire toolbar button when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('dictionary');
-    if (btn) btn.addEventListener('click', showDictionaryForSelection);
-  });
-} else {
-  const btn = document.getElementById('dictionary');
-  if (btn) btn.addEventListener('click', showDictionaryForSelection);
-}
+// Attach event
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dictionary')?.addEventListener('click', showDictionaryForSelection);
+});
