@@ -44,19 +44,27 @@ With powerful annotation tools, seamless **text-to-speech (TTS)**, and **AI-powe
 
 ## Installation and Setup
 
-1. **Clone the Repository**  
+1. **Clone the Repository**
+   ```bash
    git clone https://github.com/SoftaBlitz-2k25/Scriptoria.git  
-   cd scriptoria  
+   cd scriptoria
+   ```  
 
-2. **Install Dependencies**  
-    npm install  
+3. **Install Dependencies**  
+   ```bash
+   npm install
+   ```    
 
-3. **Run the App**  
-    npm start  
-
-4. **Build Executable**  
-    npm run build  
-
+5. **Run the App**  
+   ```bash
+   npm start  
+   ```
+   
+7. **Build Executable**  
+   ```bash
+   npm run build  
+   ```
+   
 ## Usage Guide  
 
 Open PDF files from your local system.  
@@ -65,18 +73,4 @@ Use Q&A to ask context-based questions about your document.
 Turn on Text-to-Speech for hands-free reading.  
 Access dictionary and translation for quick learning support.  
 
-## Future Enhancements  
-
-Cloud sync for annotations  
-Encrypted local storage for notes  
-Analytics for reading time and highlights  
-Voice-controlled navigation  
-
-## Contributing  
-
-Contributions, feature requests, and bug reports are welcome!  
-To contribute: 
-Fork the repository  
-Create a feature branch (git checkout -b feature-name)  
-Commit your changes (git commit -m "Added feature XYZ")  
-Push to your branch and create a pull request  
+  
