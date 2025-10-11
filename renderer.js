@@ -4,6 +4,10 @@ let currentTab = 0;
 let thumbnailsDocIndex = null; // Index of the doc whose thumbnails remain shown
 let viewMode = 'single'; // 'single' | 'split' | 'continuous'
 
+// Expose global variables for other modules
+window.pdfDocs = pdfDocs;
+window.currentTab = currentTab;
+
 // Initialize PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -13,9 +17,40 @@ import * as UserHighlights from './features/highlights.js';
 import * as UserUnderlines from './features/underlines.js';
 import * as UserStickynotes from './features/stickynotes.js';
 import { ensureOCRTextLayer, getOCRPageText } from './build/ocr.js';
-import { setPageText, appendToPageText, getPageText } from './features/text-store.js';
+import { setPageText, appendToPageText, getPageText, getDocumentText } from './features/text-store.js';
 import { exportCurrentWithAnnotations } from './advance/exportToPdf.js';
 import { speakSelection, speakPage, stop, getSpeakingState } from './features/tts.js';
+import { showSummarizer, hideSummarizer, isSummarizerVisible } from './advance/summarize.js';
+
+// Extract text from all pages for summarization
+async function extractAllPagesText(filePath, pdf) {
+  console.log(`Extracting text from all ${pdf.numPages} pages for file: ${filePath}`);
+  
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    try {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const items = Array.isArray(textContent.items) ? textContent.items : [];
+      const extracted = items.map(i => (i.str || '')).join(' ').replace(/\s+/g, ' ').trim();
+      
+      if (extracted && extracted.length > 0) {
+        setPageText(filePath, pageNum, extracted);
+        console.log(`Page ${pageNum}: ${extracted.length} characters extracted`);
+      } else {
+        console.log(`Page ${pageNum}: No text found`);
+      }
+    } catch (error) {
+      console.error(`Error extracting text from page ${pageNum}:`, error);
+    }
+  }
+  
+  // Log total text extracted
+  const totalText = getDocumentText(filePath);
+  console.log(`Total text extracted: ${totalText.length} characters`);
+}
+
+// Expose function globally for other modules
+window.extractAllPagesText = extractAllPagesText;
 
 // Core PDF functionality
 async function loadPDF(filePath) {
@@ -48,6 +83,7 @@ async function loadPDF(filePath) {
 
     pdfDocs.push(pdfDoc);
     currentTab = pdfDocs.length - 1;
+    window.currentTab = currentTab;
 
     createTab(pdfDoc.fileName);
     await renderPage();
@@ -64,6 +100,9 @@ async function loadPDF(filePath) {
     await UserHighlights.initForFile(pdfDoc.filePath);
     await UserUnderlines.initForFile(pdfDoc.filePath);
     await UserStickynotes.initForFile(pdfDoc.filePath);
+    
+    // Extract text from all pages for summarization
+    await extractAllPagesText(pdfDoc.filePath, pdf);
     
     return pdfDoc;
   } catch (error) {
@@ -1076,4 +1115,32 @@ document.addEventListener('DOMContentLoaded', () => {
       speakPage(fileKey, currentPage);
     }
   });
+
+  // Summarizer functionality tab click (toggle show/hide)
+  const summarizerTab = document.getElementById('summarizer-tab');
+  console.log('Summarizer tab element:', summarizerTab);
+  
+  if (summarizerTab) {
+    summarizerTab.addEventListener('click', async () => {
+      console.log('Summarizer tab clicked');
+      const fileKey = pdfDocs[currentTab]?.filePath;
+      if (!fileKey) {
+        alert('No PDF loaded. Please open a PDF first.');
+        return;
+      }
+
+      console.log('File key:', fileKey);
+      console.log('Is summarizer visible:', isSummarizerVisible());
+
+      if (isSummarizerVisible()) {
+        console.log('Hiding summarizer');
+        hideSummarizer();
+      } else {
+        console.log('Showing summarizer');
+        await showSummarizer(fileKey);
+      }
+    });
+  } else {
+    console.error('Summarizer tab element not found');
+  }
 });
