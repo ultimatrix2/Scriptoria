@@ -1,9 +1,10 @@
-// PDF Summarizer using LLM server
+// PDF Summarizer using LLM server (running on localhost:5001)
 // Creates split view with PDF on left and summary on right
 
 import { getDocumentText } from '../features/text-store.js';
 
 let isSummarizerActive = false;
+let splitContainer = null;
 
 // Access global variables from renderer.js
 function getCurrentPDFDoc() {
@@ -14,20 +15,22 @@ function getCurrentTabIndex() {
   return window.currentTab || 0;
 }
 
-// LLM-based summarization using the server
+// LLM-based summarization using the server 
+// using hugging face transformers pipeline
+
 async function summarizeText(text) {
   try {
     console.log('Sending text to LLM server, length:', text.length);
     
-    // Use LLM server for summarization
-    const response = await fetch('http://127.0.0.1:5001/summarize', {
+    // Use LLM server for summarization (locally running)
+    const response = await fetch('http://127.0.0.1:5001/summarize', {  
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      body: JSON.stringify({ //  input  : JSON (structured)
         text: text,
-        max_chars: 500
+        max_chars: 500 // max characters in summary
       })
     });
 
@@ -266,8 +269,10 @@ export async function showSummarizer(filePath) {
   }
 
   const canvasContainer = document.getElementById('canvas-container');
-  if (!canvasContainer) {
-    console.error('Canvas container not found');
+  const pdfViewer = document.getElementById('pdf-viewer');
+  
+  if (!canvasContainer || !pdfViewer) {
+    console.error('Required elements not found');
     return;
   }
 
@@ -287,26 +292,42 @@ export async function showSummarizer(filePath) {
     return;
   }
 
-  console.log('Creating right panel');
-  // Create right panel for summary/QnA
+  console.log('Creating split view layout');
+  
+  // Create split container
+  splitContainer = document.createElement('div');
+  splitContainer.id = 'split-container';
+  splitContainer.style.cssText = `
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  `;
+  
+  // Create right panel
   const rightPanel = createRightPanel();
   
-  // Get pdf-viewer and set up horizontal layout
-  const pdfViewer = document.getElementById('pdf-viewer');
-  console.log('PDF viewer element:', pdfViewer);
+  // Remove canvas container from its current position
+  canvasContainer.remove();
   
-  // Set pdf-viewer to horizontal flex layout
-  pdfViewer.style.display = 'flex';
-  pdfViewer.style.setProperty('flex-direction', 'row', 'important');
-  pdfViewer.style.setProperty('align-items', 'flex-start', 'important');
+  // Update canvas container styles for left half
+  canvasContainer.style.cssText = `
+    width: 50%;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  `;
   
-  // Modify canvas container for split view (left side)
-  canvasContainer.style.width = '50%';
-  canvasContainer.style.flex = '0 0 50%';
-  canvasContainer.style.overflowY = 'auto';
+  // Add canvas container and right panel to split container
+  splitContainer.appendChild(canvasContainer);
+  splitContainer.appendChild(rightPanel);
   
-  // Add right panel to pdf-viewer (right side)
-  pdfViewer.appendChild(rightPanel);
+  // Add split container to pdf-viewer (below controls)
+  pdfViewer.appendChild(splitContainer);
   
   isSummarizerActive = true;
   console.log('Summarizer is now active');
@@ -346,7 +367,7 @@ export async function showSummarizer(filePath) {
       if (currentDoc && currentDoc.pdf) {
         // Call the extractAllPagesText function from renderer.js
         if (window.extractAllPagesText) {
-          await window.extractAllPagesText(filePath, currentDoc.pdf);
+          await window.extractAllPagesText(filePath, currentDoc.pdf);  // filepath and pdf object
         }
         const newDocumentText = getDocumentText(filePath);
         
@@ -441,26 +462,27 @@ export function hideSummarizer() {
   if (!isSummarizerActive) return;
   
   const canvasContainer = document.getElementById('canvas-container');
-  const rightPanel = document.getElementById('right-panel');
+  const pdfViewer = document.getElementById('pdf-viewer');
   
   console.log('Canvas container:', canvasContainer);
-  console.log('Right panel:', rightPanel);
+  console.log('Split container:', splitContainer);
   
-  if (rightPanel) {
-    rightPanel.remove();
-    console.log('Right panel removed');
+  if (canvasContainer && splitContainer) {
+    // Remove canvas container from split container
+    canvasContainer.remove();
+    
+    // Restore original canvas container styles
+    canvasContainer.style.cssText = '';
+    
+    // Add canvas container back to pdf-viewer (below controls)
+    pdfViewer.appendChild(canvasContainer);
+    
+    // Remove split container
+    splitContainer.remove();
+    splitContainer = null;
+    
+    console.log('Layout restored to original state');
   }
-  
-  // Restore canvas container and pdf-viewer layout
-  canvasContainer.style.width = '100%';
-  canvasContainer.style.flex = '1';
-  canvasContainer.style.overflowY = '';
-  
-  // Restore pdf-viewer to original layout
-  const pdfViewer = document.getElementById('pdf-viewer');
-  pdfViewer.style.display = 'flex';
-  pdfViewer.style.setProperty('flex-direction', 'column', 'important');
-  pdfViewer.style.setProperty('align-items', 'center', 'important');
   
   isSummarizerActive = false;
   console.log('Summarizer is now inactive');
