@@ -18,14 +18,17 @@ With powerful annotation tools, seamless **text-to-speech (TTS)**, and **AI-powe
 ##  Features
 
 ### Basic Features
--  **Multi-tab Interface** – Open and read multiple PDFs simultaneously. 
--  **Page Navigation** – Includes page thumbnails, bookmarks, and search.  
--  **Annotations** – Highlight, underline, and bookmark key sections.  
--  **Save & Export** – Save your annotations locally for future reference.  
--  **Reader Modes** – Dark mode and full-screen view for comfortable reading.
+-   **Multi-tab Interface** – Open and read multiple PDFs simultaneously.
+-   **Seamless Navigation**: Quickly jump between pages using next/previous buttons or direct page input.
+-   **Page Preview Modes**: Switch between Single, Split, and Continuous viewing for personalized reading
+-   **Dynamic View Adjustment**: Rotate pages left or right for flexible reading orientations.
+-   **Precision Zooming**: Smooth Zoom In/Out functionality for detailed content inspection.
+-   **Annotations** – Highlight, underline, and bookmark key sections.
+-   **Save & Export** – Save your annotations locally for future reference.
+-   **Reader Modes** – Light/Dark mode and full-screen view for comfortable reading.
 
 ###  Advanced Features
--  **Interactive Q&A** – Ask natural language questions about the document content.  
+-  **Interactive AI-Powered Summarizer & QnA Module** – Ask natural language questions about the document content.  
 -  **Text-to-Speech (TTS)** – Listen to the PDF text read aloud using modern speech synthesis.  
 -  **Dictionary & Translation** – Instantly look up meanings and translate selected text.
 
@@ -36,9 +39,15 @@ With powerful annotation tools, seamless **text-to-speech (TTS)**, and **AI-powe
 | Layer | Technology |
 |:------|:------------|
 | **Desktop Framework** | Electron |
-| **PDF Rendering** | pdf.js |
+| **PDF Engine** | pdf.js , Tesseract.js (OCR ) |
 | **Frontend** | HTML, CSS, JavaScript |
 | **Utilities** | Node.js, File System APIs |
+| **Annotations** | JSON sidecars per-PDF , SHA-256 hashing |
+| **AI/ML** | Python, Jupyter Notebook, Hugging Face Transformers library , PyTorch , Flask |
+| **Models** | Helsinki-NLP opus-mt, DistilBERT-cnn-12-6 |
+| **Database** | local Storage |
+| **TTS** | SpeechSynthesis |
+| **Dictionary** | Free dictionary API |
 
 ---
 
