@@ -51,6 +51,15 @@ With powerful annotation tools, seamless **text-to-speech (TTS)**, and **AI-powe
 
 ---
 
+##  Screenshots
+
+### 🏠 Home Page
+![Home Page](assets/screenshots/homepage.png)
+
+### 📝 Annotations
+![Annotations](assets/screenshots/annotations.png)
+
+---
 ## Installation and Setup
 
 1. **Clone the Repository**
