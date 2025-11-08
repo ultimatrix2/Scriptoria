@@ -53,11 +53,20 @@ With powerful annotation tools, seamless **text-to-speech (TTS)**, and **AI-powe
 
 ##  Screenshots
 
-### 🏠 Home Page
-![Home Page](assets/screenshots/homepage.png)
+###  Annotations
+![Annotations](icons/anotate.png)
 
-### 📝 Annotations
-![Annotations](assets/screenshots/annotations.png)
+### Summarizer and QnA
+![Summarizer and QnA](icons/qnaa.png)
+
+###  Navigation
+![Navigation](icons/nav.png)
+
+###  Text-to-speech
+![TTS](icons/tts.png)
+
+###  Dictionary
+![Dictionary](icons/dic.png)
 
 ---
 ## Installation and Setup
