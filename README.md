@@ -190,7 +190,7 @@ cd model
 start_server.bat
 ```
 
-> **Note:** On the first run the server will download the required Hugging Face models (Helsinki-NLP opus-mt, DistilBERT-cnn-12-6). This may take a few minutes depending on your internet connection.
+> **Note:** On the first run, the server will download the required Hugging Face models (Helsinki-NLP opus-mt, DistilBERT-cnn-12-6). This may take a few minutes depending on your internet connection.
 
 ---
 
