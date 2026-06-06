@@ -1,5 +1,4 @@
-// using cache so we don't  have to re-run OCR on every zoom; boxes are stored normalized.
-// still need to work on this ;  chekc again
+// OCR module using Tesseract.js — caches recognized words (normalized 0..1) to avoid re-running on zoom.
  
 const ocrCache = new Map();  // key: `${filePath}::${pageNumber}` -> { width, height, words: [{ text, x, y, w, h }] normalized 0..1 }
 

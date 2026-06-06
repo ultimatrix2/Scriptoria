@@ -5,6 +5,7 @@ import { getCurrentSelectionText, getPageText, getDocumentText } from './text-st
 
 let currentUtterance = null;
 let isSpeaking = false;
+let originalIconHTML = null;
 
 export function speakText(text) {
 	const clean = String(text || '').trim();
@@ -80,16 +81,25 @@ function updateTTSButtonState() {
 	const icon = ttsTab.querySelector('.tab-icon');
 	const text = ttsTab.querySelector('.tab-text');
 	
+	// Save original icon HTML on first call so we can restore it later
+	if (originalIconHTML === null && icon) {
+		originalIconHTML = icon.innerHTML;
+	}
+	
 	if (isSpeaking) {
-		// Show stop state
-		icon.textContent = '⏹️';
-		text.textContent = 'Stop';
+		// Show stop state — use innerHTML to preserve element structure
+		if (icon) icon.innerHTML = '<img src="icons/audio-stop.svg" alt="stop" class="icon" onerror="this.outerHTML=\'⏹️\'" />';
+		if (text) text.textContent = 'Stop';
 		ttsTab.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)';
 		ttsTab.style.borderColor = '#d63031';
 	} else {
-		// Show play state
-		icon.textContent = '🔊';
-		text.textContent = 'Audio';
+		// Restore original SVG icon
+		if (icon && originalIconHTML) {
+			icon.innerHTML = originalIconHTML;
+		} else if (icon) {
+			icon.innerHTML = '<img src="icons/audio-play.svg" alt="audio-on" class="icon" />';
+		}
+		if (text) text.textContent = 'Audio';
 		ttsTab.style.background = 'linear-gradient(135deg, #a5d6a7 0%, #66bb6a 100%)';
 		ttsTab.style.borderColor = '#388e3c';
 	}

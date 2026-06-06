@@ -20,7 +20,7 @@ function getCurrentTabIndex() {
 
 async function summarizeText(text) {
   try {
-    console.log('Sending text to LLM server, length:', text.length);
+
     
     // Use LLM server for summarization (locally running)
     const response = await fetch('http://127.0.0.1:5001/summarize', {  
@@ -39,7 +39,7 @@ async function summarizeText(text) {
     }
 
     const result = await response.json();
-    console.log('LLM summary received:', result.summary?.length || 0, 'characters');
+
     return result.summary || 'No summary generated.';
   } catch (error) {
     console.error('LLM summarization failed:', error);
@@ -261,7 +261,7 @@ function createRightPanel() {
 
 // Show summarizer split view
 export async function showSummarizer(filePath) {
-  console.log('showSummarizer called with filePath:', filePath);
+
   
   if (!filePath) {
     alert('No PDF loaded. Please open a PDF first.');
@@ -278,21 +278,21 @@ export async function showSummarizer(filePath) {
 
   // Check if summarizer is already active
   if (isSummarizerActive) {
-    console.log('Summarizer already active, hiding');
+
     hideSummarizer();
     return;
   }
 
   // Get document text
   const documentText = getDocumentText(filePath);
-  console.log('Document text length:', documentText ? documentText.length : 0);
+
   
   if (!documentText || documentText.trim().length === 0) {
     alert('No text found in PDF. The document may be image-based or text extraction failed.');
     return;
   }
 
-  console.log('Creating split view layout');
+
   
   // Create split container
   splitContainer = document.createElement('div');
@@ -330,7 +330,7 @@ export async function showSummarizer(filePath) {
   pdfViewer.appendChild(splitContainer);
   
   isSummarizerActive = true;
-  console.log('Summarizer is now active');
+
   
   // Generate summary
   try {
@@ -442,30 +442,85 @@ export async function showSummarizer(filePath) {
     });
   });
   
-  // QnA functionality (placeholder)
-  rightPanel.querySelector('#ask-question').addEventListener('click', () => {
-    const question = rightPanel.querySelector('#question-input').value.trim();
+  // Helper to escape HTML characters
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Helper to call backend Q&A pipeline
+  async function fetchAnswer(question, context) {
+    try {
+      const response = await fetch('http://127.0.0.1:5001/qa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question, context })
+      });
+      if (!response.ok) {
+        throw new Error(`Server returned status: ${response.status}`);
+      }
+      const result = await response.json();
+      return result.answer || "No answer returned from model.";
+    } catch (err) {
+      console.error("QA error:", err);
+      return "Error: Could not connect to Q&A server. Ensure server.py is running.";
+    }
+  }
+
+  // QnA functionality
+  rightPanel.querySelector('#ask-question').addEventListener('click', async () => {
+    const questionInput = rightPanel.querySelector('#question-input');
+    const question = questionInput.value.trim();
     const results = rightPanel.querySelector('#qna-results');
     
-    if (question) {
-      results.textContent = `Q: ${question}\n\nA: Q&A functionality is not yet implemented. This will be added in a future update.`;
-    } else {
+    if (!question) {
       results.textContent = 'Please enter a question first.';
+      return;
     }
+    
+    results.innerHTML = '<span style="color:#666;">Analyzing document and generating answer...</span>';
+    
+    const currentDoc = getCurrentPDFDoc();
+    const filePath = currentDoc?.filePath;
+    if (!filePath) {
+      results.textContent = 'Error: No active PDF document found.';
+      return;
+    }
+    
+    const context = getDocumentText(filePath);
+    if (!context || context.trim().length === 0) {
+      results.textContent = 'Error: Document text not extracted yet. Click the "Extract Text" button under Summary first.';
+      return;
+    }
+    
+    const answer = await fetchAnswer(question, context);
+    results.innerHTML = `
+      <div style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
+        <strong style="color:#333;">Q: ${escapeHtml(question)}</strong>
+      </div>
+      <div>
+        <span style="color:#111827; font-weight:500; white-space:pre-wrap;">${escapeHtml(answer)}</span>
+      </div>
+    `;
   });
 }
 
 // Hide summarizer and restore normal view
 export function hideSummarizer() {
-  console.log('hideSummarizer called, isSummarizerActive:', isSummarizerActive);
+
   
   if (!isSummarizerActive) return;
   
   const canvasContainer = document.getElementById('canvas-container');
   const pdfViewer = document.getElementById('pdf-viewer');
   
-  console.log('Canvas container:', canvasContainer);
-  console.log('Split container:', splitContainer);
+
+
   
   if (canvasContainer && splitContainer) {
     // Remove canvas container from split container
@@ -481,11 +536,27 @@ export function hideSummarizer() {
     splitContainer.remove();
     splitContainer = null;
     
-    console.log('Layout restored to original state');
+
   }
   
   isSummarizerActive = false;
-  console.log('Summarizer is now inactive');
+
+}
+
+// Expose showQnAPanel function
+export async function showQnAPanel(filePath) {
+
+  if (!isSummarizerActive) {
+    await showSummarizer(filePath);
+  }
+  
+  const rightPanel = document.getElementById('right-panel');
+  if (rightPanel) {
+    const qnaTab = rightPanel.querySelector('.panel-tab[data-panel="qna"]');
+    if (qnaTab) {
+      qnaTab.click();
+    }
+  }
 }
 
 // Export functions for external use

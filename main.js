@@ -108,7 +108,6 @@ ipcMain.handle("annotations:initAll", async (event, { filePath }) => {
     ensureFile(dir, "bookmarks.json");
     ensureFile(dir, "highlights.json");
     ensureFile(dir, "underlines.json");
-    ensureFile(dir, "stickynotes.json");
     return true;
   } catch (e) {
     return false;

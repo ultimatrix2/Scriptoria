@@ -3,6 +3,7 @@ let pdfDocs = [];
 let currentTab = 0;
 let thumbnailsDocIndex = null; // Index of the doc whose thumbnails remain shown
 let viewMode = 'single'; // 'single' | 'split' | 'continuous'
+let continuousObserver = null;
 
 // Expose global variables for other modules
 window.pdfDocs = pdfDocs;
@@ -15,16 +16,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 import * as UserBookmarks from './features/bookmarks.js';
 import * as UserHighlights from './features/highlights.js';
 import * as UserUnderlines from './features/underlines.js';
-import * as UserStickynotes from './features/stickynotes.js';
 import { ensureOCRTextLayer, getOCRPageText } from './build/ocr.js';
 import { setPageText, appendToPageText, getPageText, getDocumentText } from './features/text-store.js';
 import { exportCurrentWithAnnotations } from './advance/exportToPdf.js';
 import { speakSelection, speakPage, stop, getSpeakingState } from './features/tts.js';
-import { showSummarizer, hideSummarizer, isSummarizerVisible } from './advance/summarize.js';
+import { showSummarizer, hideSummarizer, isSummarizerVisible, showQnAPanel } from './advance/summarize.js';
 
 // Extract text from all pages for summarization
 async function extractAllPagesText(filePath, pdf) {
-  console.log(`Extracting text from all ${pdf.numPages} pages for file: ${filePath}`);
+
   
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     try {
@@ -35,9 +35,9 @@ async function extractAllPagesText(filePath, pdf) {
       
       if (extracted && extracted.length > 0) {
         setPageText(filePath, pageNum, extracted);
-        console.log(`Page ${pageNum}: ${extracted.length} characters extracted`);
+
       } else {
-        console.log(`Page ${pageNum}: No text found`);
+
       }
     } catch (error) {
       console.error(`Error extracting text from page ${pageNum}:`, error);
@@ -46,7 +46,7 @@ async function extractAllPagesText(filePath, pdf) {
   
   // Log total text extracted
   const totalText = getDocumentText(filePath);
-  console.log(`Total text extracted: ${totalText.length} characters`);
+
 }
 
 // Expose function globally for other modules
@@ -91,7 +91,6 @@ async function loadPDF(filePath) {
     // Always set thumbnails to the currently opened PDF
     thumbnailsDocIndex = currentTab;
     await generateThumbnailsForDoc(thumbnailsDocIndex);
-    await loadBookmarks(pdf);
     // Initialize user bookmarks store for this file
     await UserBookmarks.initForFile(pdfDoc.filePath);
     // Ensure sidecar files exist
@@ -99,7 +98,6 @@ async function loadPDF(filePath) {
     // Load other stores
     await UserHighlights.initForFile(pdfDoc.filePath);
     await UserUnderlines.initForFile(pdfDoc.filePath);
-    await UserStickynotes.initForFile(pdfDoc.filePath);
     
     // Extract text from all pages for summarization
     await extractAllPagesText(pdfDoc.filePath, pdf);
@@ -113,6 +111,13 @@ async function loadPDF(filePath) {
 
 async function renderPage() {
   if (!pdfDocs[currentTab]) return;
+
+  // Disconnect any existing continuous observer to avoid memory leaks
+  if (continuousObserver) {
+    continuousObserver.disconnect();
+    continuousObserver = null;
+  }
+
   const container = document.getElementById('canvas-container');
   // Clear previous children
   container.innerHTML = '';
@@ -135,18 +140,66 @@ async function renderPage() {
       secondCanvas.style.display = 'none';
     }
   } else if (viewMode === 'continuous') {
+    // Determine the viewport dimensions from the first page as placeholder sizes
+    const firstPage = await pdf.getPage(1);
+    const defaultViewport = firstPage.getViewport({ scale, rotation });
+    const defaultWidth = defaultViewport.width;
+    const defaultHeight = defaultViewport.height;
+
+    continuousObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const wrapper = entry.target;
+          const pNum = parseInt(wrapper.dataset.pageNum);
+          if (!wrapper.dataset.rendered) {
+            wrapper.dataset.rendered = 'true';
+            const canvas = wrapper.querySelector('canvas');
+            renderSingleCanvas(canvas, pdf, pNum, scale, rotation);
+          }
+        }
+      });
+    }, {
+      root: null, // default to the viewport
+      rootMargin: '600px 0px', // load pages ahead of scroll
+      threshold: 0.01
+    });
+
     for (let i = 1; i <= pdf.numPages; i++) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'page-wrapper';
+      wrapper.style.position = 'relative';
+      wrapper.style.width = `${defaultWidth}px`;
+      wrapper.style.height = `${defaultHeight}px`;
+      wrapper.style.margin = '15px auto';
+      wrapper.dataset.pageNum = i;
+
       const canvas = document.createElement('canvas');
-      container.appendChild(canvas);
-      // eslint-disable-next-line no-await-in-loop
-      await renderSingleCanvas(canvas, pdf, i, scale, rotation);
+      canvas.width = defaultWidth;
+      canvas.height = defaultHeight;
+
+      // Draw loading placeholder page background
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(0, 0, defaultWidth, defaultHeight);
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`Loading Page ${i}...`, defaultWidth / 2, defaultHeight / 2);
+
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
+      continuousObserver.observe(wrapper);
     }
-    // After rendering all pages, scroll the current page into view
-    const canvases = Array.from(container.querySelectorAll('canvas'));
-    const targetCanvas = canvases[pageNum - 1];
-    if (targetCanvas) {
-      targetCanvas.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+
+    // After setting up observers, scroll the target page into view
+    setTimeout(() => {
+      const wrappers = Array.from(container.querySelectorAll('.page-wrapper'));
+      const targetWrapper = wrappers[pageNum - 1];
+      if (targetWrapper) {
+        targetWrapper.scrollIntoView({ block: 'start' });
+      }
+    }, 100);
   }
 
   // Update page counter and zoom
@@ -399,7 +452,31 @@ function drawAnnotations(wrapper, pageNumber, pageWidth, pageHeight) {
     }
   }
 
-  // Right-click to remove an annotation group (highlight/underline) by index
+  // Render text annotations
+  const allTextAnns = allHighlightsRaw
+    .map((a, idx) => ({ a, idx }))
+    .filter(({ a }) => a.page === pageNumber && a.type === 'text');
+
+  for (const { a: ann, idx } of allTextAnns) {
+    const textDiv = document.createElement('div');
+    textDiv.textContent = ann.text;
+    textDiv.classList.add('annotation-text');
+    textDiv.style.position = 'absolute';
+    textDiv.style.left = `${ann.x * pageWidth}px`;
+    textDiv.style.top = `${ann.y * pageHeight}px`;
+    textDiv.style.color = ann.color || 'red';
+    textDiv.style.fontWeight = 'bold';
+    textDiv.style.fontSize = '14px';
+    textDiv.style.pointerEvents = 'auto'; // allow mouse events
+    textDiv.style.cursor = 'pointer';
+    textDiv.style.zIndex = '50';
+    textDiv.dataset.type = 'text';
+    textDiv.dataset.index = String(idx);
+    textDiv.title = 'Right-click to delete this text annotation';
+    overlay.appendChild(textDiv);
+  }
+
+  // Right-click to remove an annotation group (highlight/underline/text) by index
   overlay.oncontextmenu = async (e) => {
     e.preventDefault();
     const target = e.target;
@@ -409,7 +486,7 @@ function drawAnnotations(wrapper, pageNumber, pageWidth, pageHeight) {
     const file = pdfDocs[currentTab]?.filePath;
     if (!type || indexStr == null || !file) return;
     const idx = parseInt(indexStr);
-    if (type === 'highlight') {
+    if (type === 'highlight' || type === 'text') {
       await UserHighlights.removeAtIndex(file, idx);
     } else if (type === 'underline') {
       await UserUnderlines.removeAtIndex(file, idx);
@@ -438,6 +515,7 @@ function createTab(fileName) {
     // Switch to this tab and update thumbnails to match
     const tabIndex = Array.from(tabsContainer.children).indexOf(tab);
     currentTab = tabIndex;
+    window.currentTab = currentTab;
     thumbnailsDocIndex = currentTab;
     await generateThumbnailsForDoc(thumbnailsDocIndex);
     await renderPage();
@@ -445,6 +523,16 @@ function createTab(fileName) {
     // Update active tab styling
     document.querySelectorAll('#tabs li').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
+
+    // Update bookmarks sidebar for new document
+    const doc = pdfDocs[currentTab];
+    if (doc && doc.pdf) {
+      const activeSidebarBtn = document.querySelector('.tab-buttons button.active');
+      const target = activeSidebarBtn ? activeSidebarBtn.getAttribute('data-target') : 'thumbnails';
+      if (target === 'bookmarks') {
+        generateBookmarkThumbnails(currentTab);
+      }
+    }
   });
   
   // Clear active class from all tabs
@@ -478,6 +566,7 @@ function closeTab(index) {
   }
   if (pdfDocs.length === 0) {
     currentTab = 0;
+    window.currentTab = currentTab;
     const container = document.getElementById('canvas-container');
     if (container) container.innerHTML = '';
     document.getElementById('page-num').value = 0;
@@ -490,16 +579,27 @@ function closeTab(index) {
   } else if (currentTab > index) {
     currentTab -= 1;
   }
+  window.currentTab = currentTab;
   // update active class
   document.querySelectorAll('#tabs li').forEach(t => t.classList.remove('active'));
   const newActive = tabsContainer.children[currentTab];
   if (newActive) newActive.classList.add('active');
   renderPage();
+
+  // Update bookmarks sidebar for new document
+  const doc = pdfDocs[currentTab];
+  if (doc && doc.pdf) {
+    const activeSidebarBtn = document.querySelector('.tab-buttons button.active');
+    const target = activeSidebarBtn ? activeSidebarBtn.getAttribute('data-target') : 'thumbnails';
+    if (target === 'bookmarks') {
+      generateBookmarkThumbnails(currentTab);
+    }
+  }
 }
 
 // Generate Thumbnails
 async function generateThumbnailsForDoc(docIndex) {
-  console.log('generateThumbnailsForDoc called with docIndex:', docIndex);
+
   const target = pdfDocs[docIndex];
   if (!target) {
     console.error('No PDF document found at index:', docIndex);
@@ -511,7 +611,7 @@ async function generateThumbnailsForDoc(docIndex) {
     console.error('Thumbnails container not found');
     return;
   }
-  console.log('Generating thumbnails for', pdf.numPages, 'pages');
+
   thumbContainer.innerHTML = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -549,26 +649,7 @@ async function generateThumbnailsForDoc(docIndex) {
   }
 }
 
-// Load Bookmarks
-async function loadBookmarks(pdf) {
-  const outline = await pdf.getOutline();
-  const bmContainer = document.getElementById("bookmarks");
-  bmContainer.innerHTML = "";
 
-  if (outline) {
-    outline.forEach((bm) => {
-      const div = document.createElement("div");
-      div.textContent = bm.title;
-      div.classList.add("bookmark-item");
-      div.addEventListener("click", async () => {
-        const dest = await pdf.getDestination(bm.dest);
-        const pageIndex = await pdf.getPageIndex(dest[0]);
-        goToPage(pageIndex + 1);
-      });
-      bmContainer.appendChild(div);
-    });
-  }
-}
 
 // Render thumbnails only for user-bookmarked pages of a document
 async function generateBookmarkThumbnails(docIndex) {
@@ -709,17 +790,25 @@ async function underlineSelection() {
 }
 
 // Add Text function
-function addTextAnnotation(text) {
-  const canvas = document.getElementById("pdf-render");
-  const textDiv = document.createElement("div");
-  textDiv.textContent = text;
-  textDiv.classList.add("annotation-text");
-  textDiv.style.position = "absolute";
-  textDiv.style.left = "100px";
-  textDiv.style.top = "100px";
-  textDiv.style.color = "red";
-  textDiv.style.fontWeight = "bold";
-  document.body.appendChild(textDiv);
+async function addTextAnnotation(text) {
+  const { wrapper, pageNum } = getCurrentWrapperAndPage();
+  if (!wrapper) return;
+  const pageWidth = wrapper.clientWidth;
+  const pageHeight = wrapper.clientHeight;
+  const fileKey = pdfDocs[currentTab]?.filePath;
+  if (!fileKey) return;
+
+  const entry = {
+    page: pageNum,
+    type: 'text',
+    x: 0.5,
+    y: 0.5,
+    text: text,
+    color: 'red'
+  };
+
+  await UserHighlights.upsert(fileKey, entry);
+  drawAnnotations(wrapper, pageNum, pageWidth, pageHeight);
 }
 
 // Dark mode functionality
@@ -773,26 +862,26 @@ function toggleFullscreen() {
 
 // Zoom functionality
 function zoomIn() {
-  console.log('zoomIn called, currentTab:', currentTab, 'pdfDocs length:', pdfDocs.length);
+
   if (!pdfDocs[currentTab]) {
     console.error('No PDF document at current tab:', currentTab);
     return;
   }
   const oldScale = pdfDocs[currentTab].scale;
   pdfDocs[currentTab].scale = Math.min(pdfDocs[currentTab].scale * 1.2, 5.0);
-  console.log('Zoom in: scale changed from', oldScale, 'to', pdfDocs[currentTab].scale);
+
   renderPage();
 }
 
 function zoomOut() {
-  console.log('zoomOut called, currentTab:', currentTab, 'pdfDocs length:', pdfDocs.length);
+
   if (!pdfDocs[currentTab]) {
     console.error('No PDF document at current tab:', currentTab);
     return;
   }
   const oldScale = pdfDocs[currentTab].scale;
   pdfDocs[currentTab].scale = Math.max(pdfDocs[currentTab].scale / 1.2, 0.2);
-  console.log('Zoom out: scale changed from', oldScale, 'to', pdfDocs[currentTab].scale);
+
   renderPage();
 }
 
@@ -833,6 +922,7 @@ async function goToPageOnDoc(docIndex, pageNumber) {
   doc.pageNum = pageNumber;
   // focus this tab
   currentTab = docIndex;
+  window.currentTab = currentTab;
   const tabsContainer = document.getElementById('tabs');
   document.querySelectorAll('#tabs li').forEach(t => t.classList.remove('active'));
   const newActive = tabsContainer.children[currentTab];
@@ -842,9 +932,9 @@ async function goToPageOnDoc(docIndex, pageNumber) {
 
 // Sidebar tab functionality
 function showSidebarTab(target) {
-  console.log('showSidebarTab called with target:', target);
+
   const sidebarContent = document.querySelectorAll('#sidebar-content > div');
-  console.log('Found sidebar content divs:', sidebarContent.length);
+
   
   sidebarContent.forEach(div => {
     div.style.display = 'none';
@@ -853,7 +943,7 @@ function showSidebarTab(target) {
   const targetElement = document.getElementById(target);
   if (targetElement) {
     targetElement.style.display = 'block';
-    console.log('Set', target, 'to display block');
+
   } else {
     console.error('Target element not found:', target);
   }
@@ -882,7 +972,7 @@ function setupDragAndDrop() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM Content Loaded - Setting up event listeners');
+
   
   // Toolbar buttons
   document.getElementById('open').addEventListener('click', async () => {
@@ -934,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (zoomInBtn) {
     zoomInBtn.addEventListener('click', () => {
-      console.log('Zoom In clicked');
+
       zoomIn();
     });
   } else {
@@ -943,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (zoomOutBtn) {
     zoomOutBtn.addEventListener('click', () => {
-      console.log('Zoom Out clicked');
+
       zoomOut();
     });
   } else {
@@ -1010,12 +1100,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Sidebar tabs
   const sidebarButtons = document.querySelectorAll('.tab-buttons button');
-  console.log('Found sidebar buttons:', sidebarButtons.length);
+
   
   sidebarButtons.forEach(button => {
     button.addEventListener('click', () => {
       const target = button.getAttribute('data-target');
-      console.log('Sidebar tab clicked:', target);
+
       showSidebarTab(target);
       // active state
       sidebarButtons.forEach(b => b.classList.remove('active'));
@@ -1039,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const firstSidebarBtn = document.querySelector('.tab-buttons button[data-target="thumbnails"]');
   if (firstSidebarBtn) {
     firstSidebarBtn.classList.add('active');
-    console.log('Set initial active tab to thumbnails');
+
     // Ensure thumbnails section is visible by default
     showSidebarTab('thumbnails');
   } else {
@@ -1054,39 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup drag and drop
   setupDragAndDrop();
 
-  // Ensure zoom and thumbnails work even if there are issues
-  console.log('Final check - ensuring all elements are properly set up');
-  
-  // Double-check zoom buttons
-  const zoomInFinal = document.getElementById('zoom-in');
-  const zoomOutFinal = document.getElementById('zoom-out');
-  console.log('Final zoom button check - In:', !!zoomInFinal, 'Out:', !!zoomOutFinal);
-  
-  // Double-check sidebar
-  const sidebar = document.getElementById('sidebar');
-  const thumbnails = document.getElementById('thumbnails');
-  console.log('Final sidebar check - Sidebar:', !!sidebar, 'Thumbnails:', !!thumbnails);
-  
-  // Expose test functions to global scope for debugging
-  window.testZoom = () => {
-    console.log('Testing zoom functionality...');
-    if (pdfDocs.length > 0) {
-      console.log('PDF loaded, testing zoom in');
-      zoomIn();
-    } else {
-      console.log('No PDF loaded, cannot test zoom');
-    }
-  };
-  
-  window.testThumbnails = () => {
-    console.log('Testing thumbnails functionality...');
-    if (pdfDocs.length > 0) {
-      console.log('PDF loaded, regenerating thumbnails');
-      generateThumbnailsForDoc(currentTab);
-    } else {
-      console.log('No PDF loaded, cannot test thumbnails');
-    }
-  };
+
 
   // TTS functionality tab click (toggle start/stop)
   document.getElementById('translation-tab')?.addEventListener('click', () => {
@@ -1118,29 +1176,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Summarizer functionality tab click (toggle show/hide)
   const summarizerTab = document.getElementById('summarizer-tab');
-  console.log('Summarizer tab element:', summarizerTab);
+
   
   if (summarizerTab) {
     summarizerTab.addEventListener('click', async () => {
-      console.log('Summarizer tab clicked');
+
       const fileKey = pdfDocs[currentTab]?.filePath;
       if (!fileKey) {
         alert('No PDF loaded. Please open a PDF first.');
         return;
       }
 
-      console.log('File key:', fileKey);
-      console.log('Is summarizer visible:', isSummarizerVisible());
+
+
 
       if (isSummarizerVisible()) {
-        console.log('Hiding summarizer');
         hideSummarizer();
       } else {
-        console.log('Showing summarizer');
         await showSummarizer(fileKey);
       }
     });
   } else {
     console.error('Summarizer tab element not found');
+  }
+
+  // Q&A functionality tab click (toggle show/hide)
+  const qnaTab = document.getElementById('qna-tab');
+  if (qnaTab) {
+    qnaTab.addEventListener('click', async () => {
+
+      const fileKey = pdfDocs[currentTab]?.filePath;
+      if (!fileKey) {
+        alert('No PDF loaded. Please open a PDF first.');
+        return;
+      }
+
+      const rightPanel = document.getElementById('right-panel');
+      const isQnAPanelActive = rightPanel && rightPanel.querySelector('#qna-panel').classList.contains('active');
+
+      if (isSummarizerVisible() && isQnAPanelActive) {
+        hideSummarizer();
+      } else {
+        await showQnAPanel(fileKey);
+      }
+    });
+  } else {
+    console.error('Q&A tab element not found');
   }
 });

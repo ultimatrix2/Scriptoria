@@ -8,6 +8,7 @@ import * as UserUnderlines from '../features/underlines.js';
 function drawPageAnnotations(ctx, pageWidth, pageHeight, fileKey, pageNumber) {
   const anns = UserHighlights.getAll(fileKey).filter(a => (a.page === pageNumber) && (a.type === 'highlight' || !a.type));
   const underlines = UserUnderlines.getAll(fileKey).filter(a => a.page === pageNumber);
+  const textAnns = UserHighlights.getAll(fileKey).filter(a => (a.page === pageNumber) && (a.type === 'text'));
 
   // Highlights
   for (const ann of anns) {
@@ -34,6 +35,16 @@ function drawPageAnnotations(ctx, pageWidth, pageHeight, fileKey, pageNumber) {
       const lineY = y + h - 2;
       ctx.fillRect(x, lineY, w, 2);
     }
+  }
+
+  // Text Annotations
+  for (const ann of textAnns) {
+    const color = ann.color || 'red';
+    ctx.fillStyle = color;
+    ctx.font = 'bold 28px sans-serif'; // Scaled up font for export scale
+    const x = ann.x * pageWidth;
+    const y = ann.y * pageHeight;
+    ctx.fillText(ann.text, x, y);
   }
 }
 

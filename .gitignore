@@ -14,3 +14,13 @@ Thumbs.db
 
 # VSCode settings
 .vscode/
+
+# API keys / Env files
+.env
+.env.local
+.env.*
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
