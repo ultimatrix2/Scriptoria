@@ -101,7 +101,7 @@ pip install flask flask-cors python-dotenv google-generativeai requests
 Create or edit the file `model/.env` and add **one** of the following API keys:
 
 ```env
-# Option 1: Google Gemini API (Recommended — free, fast, high quality)
+# Option 1: Google Gemini API 
 GEMINI_API_KEY=your_gemini_api_key_here
 
 # Option 2: Hugging Face Serverless Inference API
@@ -112,7 +112,7 @@ HF_TOKEN=your_hugging_face_token_here
 - **Gemini**: Go to [Google AI Studio](https://aistudio.google.com/apikey) → Create API Key
 - **Hugging Face**: Go to [HF Settings > Tokens](https://huggingface.co/settings/tokens) → New token (Read access)
 
-> **Note:** If no API key is configured, the server will fall back to running models locally on your CPU. This requires ~5GB of RAM and PyTorch installed (`pip install torch transformers`).
+> **Note:** If no API key is configured, the server will fall back to running models locally on your CPU. 
 
 ### 5. Start the AI Server
 Open a terminal and run:
@@ -120,12 +120,7 @@ Open a terminal and run:
 cd model
 python server.py
 ```
-You should see:
-```
-[INFO] Gemini API initialized successfully (using gemini-1.5-flash).
-[INFO] Bypassing local model loading — cloud API is active.
- * Running on http://127.0.0.1:5001
-```
+
 
 ### 6. Launch the App
 Open a **second terminal** and run:
